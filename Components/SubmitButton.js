@@ -1,24 +1,20 @@
 import React from "react";
-import { View, Button, Alert, StyleSheet } from "react-native";
+import { View, Button, StyleSheet, AccessibilityInfo } from "react-native";
 
-const SubmitButton = ({ ratings = {}, comment = "" }) => {
+const SubmitButton = ({ navigation, ratings = {}, comment = "" }) => {
   const handleSubmit = () => {
-    const formattedRatings =
-      ratings && typeof ratings === "object"
-        ? Object.entries(ratings)
-            .map(([category, value]) => `${category}: ${value}`)
-            .join("\n")
-        : "No ratings provided";
-
-    Alert.alert(
-      "Feedback Submitted",
-      `Ratings:\n${formattedRatings}\n\nComment:\n${comment || "No comment provided"}`
-    );
+    AccessibilityInfo.announceForAccessibility("Your message has been sent.");
+    navigation.navigate("Success");
   };
 
   return (
     <View style={styles.container}>
-      <Button title="Submit Rating" onPress={handleSubmit} color="#007ACC" />
+      <Button
+        title="Submit"
+        onPress={handleSubmit}
+        color="#007ACC"
+        accessibilityLabel="Submit"
+      />
     </View>
   );
 };
@@ -28,4 +24,3 @@ const styles = StyleSheet.create({
 });
 
 export default SubmitButton;
-    

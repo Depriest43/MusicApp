@@ -6,15 +6,21 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState("");
 
   const handleLogin = () => {
-    // Hardcoded credentials
     const validUsername = "CSI248JE";
     const validPassword = "1234";
 
     if (username === validUsername && password === validPassword) {
-      navigation.navigate("Home"); // Navigate to HomeScreen
+      navigation.navigate("Home");
     } else {
-      Alert.alert("Login Failed", "Invalid username or password. Please try again.");
-      }
+      Alert.alert(
+        "Login Failed",
+        "Invalid username or password. Please try again."
+      );
+    }
+  };
+
+  const handleBackToWelcome = () => {
+    navigation.navigate("Welcome"); // 👈 Make sure "Welcome" is registered in your navigator
   };
 
   return (
@@ -38,6 +44,16 @@ const LoginScreen = ({ navigation }) => {
       />
 
       <Button title="Login" onPress={handleLogin} />
+
+      {/* ✅ Back to Welcome Page Button */}
+      <View style={styles.backButton}>
+        <Button
+          title="Back to Welcome Page"
+          onPress={handleBackToWelcome}
+          color="#888"
+          accessibilityLabel="Go back to the welcome screen"
+        />
+      </View>
     </View>
   );
 };
@@ -46,6 +62,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, justifyContent: "center" },
   label: { fontSize: 16, marginBottom: 5 },
   input: { borderWidth: 1, padding: 10, marginBottom: 15, borderRadius: 5 },
+  backButton: { marginTop: 15 },
 });
 
 export default LoginScreen;

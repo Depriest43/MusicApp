@@ -1,30 +1,38 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, Slider, StyleSheet } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  AccessibilityInfo,
+} from "react-native";
 import { Audio } from "expo-av";
+import Slider from "@react-native-community/slider";
 
 const AudioPlayer = ({ song }) => {
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(1);
+  const intervalRef = useRef(null);
 
   useEffect(() => {
-    if (song) {
-      loadSound();
-    }
+    if (song) loadSound();
 
     return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
       if (sound) {
-        sound.unloadAsync();
+        sound.unloadAsync().catch((err) =>
+          console.error("Error unloading sound:", err)
+        );
       }
     };
   }, [song]);
 
   const loadSound = async () => {
+    if (!song) return;
     try {
-      if (sound) {
-        await sound.unloadAsync();
-      }
+      if (sound) await sound.unloadAsync();
 
       const { sound: newSound, status } = await Audio.Sound.createAsync(
         song.file,
@@ -33,19 +41,42 @@ const AudioPlayer = ({ song }) => {
       );
 
       setSound(newSound);
-      setDuration(status.durationMillis || 0);
+      if (status && status.durationMillis) {
+        setDuration(status.durationMillis);
+      }
+
+      AccessibilityInfo.announceForAccessibility(`Loaded ${song.title}`);
     } catch (error) {
       console.error("Error loading sound:", error);
     }
   };
 
   const updatePlaybackStatus = (status) => {
-    if (status.isLoaded) {
+    if (status?.isLoaded) {
       setPosition(status.positionMillis || 0);
-      setDuration(status.durationMillis || 0);
+      setDuration(status.durationMillis || 1);
       if (status.didJustFinish) {
         setIsPlaying(false);
+        setPosition(0);
+        if (intervalRef.current) clearInterval(intervalRef.current);
       }
+    }
+  };
+
+  const startUpdatingProgress = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(async () => {
+      if (sound) {
+        const status = await sound.getStatusAsync();
+        updatePlaybackStatus(status);
+      }
+    }, 500);
+  };
+
+  const stopUpdatingProgress = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
   };
 
@@ -53,8 +84,12 @@ const AudioPlayer = ({ song }) => {
     if (!sound) return;
     if (isPlaying) {
       await sound.pauseAsync();
+      stopUpdatingProgress();
+      AccessibilityInfo.announceForAccessibility("Paused playback.");
     } else {
       await sound.playAsync();
+      startUpdatingProgress();
+      AccessibilityInfo.announceForAccessibility(`Playing ${song.title}`);
     }
     setIsPlaying(!isPlaying);
   };
@@ -64,6 +99,7 @@ const AudioPlayer = ({ song }) => {
       const newPosition = Math.max(position - 5000, 0);
       await sound.setPositionAsync(newPosition);
       setPosition(newPosition);
+      AccessibilityInfo.announceForAccessibility("Rewinding 5 seconds.");
     }
   };
 
@@ -72,21 +108,38 @@ const AudioPlayer = ({ song }) => {
       const newPosition = Math.min(position + 5000, duration);
       await sound.setPositionAsync(newPosition);
       setPosition(newPosition);
+      AccessibilityInfo.announceForAccessibility("Fast forwarding 5 seconds.");
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.songTitle}>{song ? `Now Playing: ${song.title}` : "No Song Selected"}</Text>
+      <Text style={styles.songTitle} accessibilityRole="header">
+        {song ? `Now Playing: ${song.title}` : "Select a song to play"}
+      </Text>
 
       <View style={styles.controls}>
-        <TouchableOpacity onPress={handleRewind} style={styles.button}>
+        <TouchableOpacity
+          onPress={handleRewind}
+          style={styles.button}
+          accessibilityLabel="Rewind 5 seconds"
+        >
           <Text style={styles.buttonText}>⏪</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={togglePlayPause} style={styles.button}>
+
+        <TouchableOpacity
+          onPress={togglePlayPause}
+          style={styles.button}
+          accessibilityLabel={isPlaying ? "Pause playback" : "Play song"}
+        >
           <Text style={styles.buttonText}>{isPlaying ? "⏸" : "▶"}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleFastForward} style={styles.button}>
+
+        <TouchableOpacity
+          onPress={handleFastForward}
+          style={styles.button}
+          accessibilityLabel="Fast forward 5 seconds"
+        >
           <Text style={styles.buttonText}>⏩</Text>
         </TouchableOpacity>
       </View>
@@ -97,6 +150,7 @@ const AudioPlayer = ({ song }) => {
         maximumValue={duration}
         value={position}
         onSlidingComplete={(val) => sound && sound.setPositionAsync(val)}
+        accessibilityLabel="Playback progress slider"
       />
 
       <Text style={styles.timer}>
@@ -117,7 +171,12 @@ const styles = StyleSheet.create({
   container: { alignItems: "center", marginTop: 20 },
   songTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
   controls: { flexDirection: "row", justifyContent: "center", marginTop: 10 },
-  button: { marginHorizontal: 10, padding: 10, backgroundColor: "#007ACC", borderRadius: 5 },
+  button: {
+    marginHorizontal: 10,
+    padding: 10,
+    backgroundColor: "#007ACC",
+    borderRadius: 5,
+  },
   buttonText: { fontSize: 20, color: "white" },
   slider: { width: 200, height: 40, marginTop: 10 },
   timer: { fontSize: 16, marginTop: 10 },
